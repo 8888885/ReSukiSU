@@ -9,7 +9,7 @@ use crate::android::susfs::config;
 use crate::android::susfs::config::data::Data;
 
 fn is_sdcard_mounted() -> bool {
-    let file = match fs::read_to_string("/proc/mounts") {
+    let file = match fs::read_to_string("/proc/self/mounts") {
         Ok(f) => f,
         Err(e) => {
             log::debug!("failed to read mounts");
