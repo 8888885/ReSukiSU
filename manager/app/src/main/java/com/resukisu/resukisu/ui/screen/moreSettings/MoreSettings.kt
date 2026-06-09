@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
@@ -87,7 +86,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import com.resukisu.resukisu.R
-import com.resukisu.resukisu.ui.MainActivity
+import com.resukisu.resukisu.ksuApp
 import com.resukisu.resukisu.ui.component.ConfirmResult
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.rememberCustomDialog
@@ -136,8 +135,7 @@ fun MoreSettingsScreen() {
     val systemIsDark = isSystemInDarkTheme()
 
     // 创建设置状态管理器
-    val activity = LocalActivity.current as MainActivity
-    val settingsViewModel = viewModel<SettingsViewModel>(viewModelStoreOwner = activity)
+    val settingsViewModel = viewModel<SettingsViewModel>(viewModelStoreOwner = ksuApp)
     val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
     // TODO Add In app crop as fallback
