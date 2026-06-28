@@ -2,7 +2,7 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result};
 use libc::_exit;
-use log::{info, warn};
+use log::{error, info, warn};
 use prop_rs_android::{resetprop::ResetProp, sys_prop};
 use rustix::process::chdir;
 
@@ -17,6 +17,11 @@ use crate::{
 };
 
 pub fn on_post_data_fs() -> Result<()> {
+    if ksucalls::is_uapi_version_mismatch() {
+        error!("Kernel and userspace uapi version mismatch! skip on_post_fs_data");
+        return Ok(());
+    }
+
     ksucalls::report_post_fs_data();
 
     utils::umask(0);
@@ -169,12 +174,22 @@ pub fn run_stage(stage: &str, block: bool) {
 }
 
 pub fn on_services() {
+    if ksucalls::is_uapi_version_mismatch() {
+        error!("Kernel and userspace uapi version mismatch! skip on_services");
+        return;
+    }
+
     info!("on_services triggered!");
     crate::android::susfs::init_event::on_services();
     run_stage("service", false);
 }
 
 pub fn on_boot_completed() {
+    if ksucalls::is_uapi_version_mismatch() {
+        error!("Kernel and userspace uapi version mismatch! skip on_boot_completed");
+        return;
+    }
+
     ksucalls::report_boot_complete();
     // Load susfs boot-completed
     let _ = std::thread::Builder::new()
@@ -194,6 +209,7 @@ const fn resetprop() -> ResetProp {
         persist_only: false,
         verbose: false,
         show_context: false,
+        rebuild: false,
     }
 }
 
@@ -254,6 +270,12 @@ fn catch_bootlog(logname: &str, command: &[&str]) -> Result<()> {
 }
 
 pub fn soft_reboot() -> Result<()> {
+    // check it avoid user click "soft_reboot" in manager when version mismatch
+    if ksucalls::is_uapi_version_mismatch() {
+        error!("Kernel and userspace uapi version mismatch! skip soft_reboot");
+        return Ok(());
+    }
+
     utils::daemonize_with(true, || -> Result<()> {
         switch_mnt_ns(1)?;
         chdir("/")?;
