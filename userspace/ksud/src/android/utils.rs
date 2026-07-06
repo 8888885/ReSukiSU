@@ -23,7 +23,7 @@ use crate::{
     android::{ksucalls, module, restorecon},
     assets, boot_patch,
     boot_patch::BootRestoreArgs,
-    defs,
+    defs::{self, KSU_TEMP_BACKUP_DIR_NAME},
 };
 
 #[macro_export]
@@ -188,11 +188,13 @@ fn link_ksud_to_bin() -> Result<()> {
     Ok(())
 }
 
-pub fn install(libadbroot: Option<PathBuf>) -> Result<()> {
+pub fn install(libadbroot: Option<PathBuf>, data_path: Option<PathBuf>) -> Result<()> {
     ensure_dir_exists(defs::ADB_DIR)?;
     let _ = std::fs::remove_file(defs::DAEMON_PATH);
     std::fs::copy(
-        std::env::current_exe().with_context(|| "Failed to get self exe path")?,
+        // We should use /proc/self/exe, DO NOT resolve the real path
+        // So that if someone execute /data/adb/ksud install, ksud won't be removed unexpectedly
+        "/proc/self/exe",
         defs::DAEMON_PATH,
     )?;
     restorecon::lsetfilecon(defs::DAEMON_PATH, restorecon::ADB_CON)?;
@@ -206,6 +208,29 @@ pub fn install(libadbroot: Option<PathBuf>) -> Result<()> {
         let _ = std::fs::remove_file(defs::LIBADBROOT_PATH);
         let _ = std::fs::copy(libadbroot, defs::LIBADBROOT_PATH);
     }
+
+    if let Some(data_path) = data_path {
+        let backup_path = data_path.join(KSU_TEMP_BACKUP_DIR_NAME);
+        if backup_path.is_dir() {
+            for ent in backup_path.read_dir()? {
+                let ent = ent?;
+                if ent.file_type().is_ok_and(|v| v.is_file()) {
+                    let name = ent.file_name().to_string_lossy().to_string();
+                    let target = format!("{}{name}", defs::KSU_BACKUP_DIR);
+                    if name.starts_with(defs::KSU_BACKUP_FILE_PREFIX)
+                        && std::fs::rename(ent.path(), &target).is_err()
+                    {
+                        std::fs::copy(ent.path(), &target).with_context(|| {
+                            format!("failed to move {} -> {target}", ent.path().display())
+                        })?;
+                        log::info!("move boot backup {name}");
+                    }
+                }
+            }
+            std::fs::remove_dir_all(&backup_path)?;
+        }
+    }
+
     Ok(())
 }
 
